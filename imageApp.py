@@ -6,9 +6,12 @@ class ImageApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Image viewer Piotr Szumowski")
+        self.screen_width = root.winfo_screenwidth()
+        self.screen_height = root.winfo_screenheight()
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}")
 
-        self.frame = tk.LabelFrame(root, padx=50, pady=50)
-        self.frame.pack(padx=10, pady=10)
+        self.frame = tk.LabelFrame(self.root, padx=10, pady=10, labelanchor="n")
+        self.frame.pack(side="top", fill="both")
 
         self.loadJPGButton = tk.Button(self.frame, text="Load JPG", command=self.loadJPG, padx=20, pady=20)
         self.loadJPGButton.grid(row=0, column=0)
@@ -16,6 +19,8 @@ class ImageApp:
         self.saveJPGButton = tk.Button(self.frame, text="Save JPG", command=self.saveJPG, padx=20, pady=20)
         self.saveJPGButton.grid(row=0, column=1)
 
+        self.frameImage = tk.LabelFrame(self.root, labelanchor="n")
+        self.frameImage.pack()
         self.imageLabel = None
 
     def loadJPG(self):
@@ -24,8 +29,8 @@ class ImageApp:
         self.tk_image = ImageTk.PhotoImage(self.image)
         if self.imageLabel is not None:
             self.imageLabel.pack_forget()
-        self.imageLabel = tk.Label(self.root, image=self.tk_image)
-        self.imageLabel.pack()
+        self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
+        self.imageLabel.pack(side="top")
 
     def saveJPG(self):
         if hasattr(self, 'image'):
