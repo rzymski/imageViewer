@@ -2,6 +2,8 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter.filedialog import asksaveasfilename, askopenfilename
 
+from tkinter import ALL, EventType
+
 import time
 
 class ImageApp:
@@ -34,33 +36,58 @@ class ImageApp:
         self.imageSpace.pack(fill="both", expand=True)
         self.image = None
         self.imageId = None
-
         self.movedX = 0
         self.movedY = 0
 
-    def move_image(self, dx, dy):
+    def zoom_settings(self):
+        self.root.bind("<MouseWheel>", self.wheel)
+        self.imscale = 1.0
+        self.delta = 0.75
+        self.text = self.imageSpace.create_text(0, 0, anchor='nw', text='')
+        self.show_image()
+        self.imageSpace.configure(scrollregion=self.imageSpace.bbox('all'))
+
+    def wheel(self, event):
+        scale = 1.0
+        if event.delta == -120:
+            scale *= self.delta
+            self.imscale *= self.delta
+        if event.delta == 120:
+            scale /= self.delta
+            self.imscale /= self.delta
+        # Rescale all canvas objects
+        x = self.imageSpace.canvasx(event.x)
+        y = self.imageSpace.canvasy(event.y)
+        self.imageSpace.scale(self.imageId, x, y, scale, scale)
+        self.show_image()
+    def show_image(self):
+        if self.imageId:
+            self.imageSpace.delete(self.imageId)
+            self.imageId = None
+            self.imageSpace.imagetk = None
+        width, height = self.image.size
+        new_size = int(self.imscale * width), int(self.imscale * height)
+        imagetk = ImageTk.PhotoImage(self.image.resize(new_size))
+        # # Use self.text object to set proper coordinates
+        self.imageId = self.imageSpace.create_image(self.imageSpace.coords(self.text), anchor='nw', image=imagetk)
+        self.imageSpace.lower(self.imageId)
+        self.imageSpace.imagetk = imagetk
+        self.movedX = 0
+        self.movedY = 0
+
+    def move_image(self, event, dx, dy):
         if self.imageId is not None:
+            dx *= self.imscale
+            dy *= self.imscale
             self.movedX += dx
             self.movedY += dy
             self.imageSpace.move(self.imageId, dx, dy)
 
-    def move_image_left(self, event):
-        self.move_image(10, 0)
-
-    def move_image_right(self, event):
-        self.move_image(-10, 0)
-
-    def move_image_up(self, event):
-        self.move_image(0, 10)
-
-    def move_image_down(self, event):
-        self.move_image(0, -10)
-
     def bind_keyboard_events(self):
-        self.root.bind("<Left>", self.move_image_left)
-        self.root.bind("<Right>", self.move_image_right)
-        self.root.bind("<Up>", self.move_image_up)
-        self.root.bind("<Down>", self.move_image_down)
+        self.root.bind("<Left>", lambda event: self.move_image(event, dx=10, dy=0))
+        self.root.bind("<Right>", lambda event: self.move_image(event, dx=-10, dy=0))
+        self.root.bind("<Up>", lambda event: self.move_image(event, dx=0, dy=10))
+        self.root.bind("<Down>", lambda event: self.move_image(event, dx=0, dy=-10))
 
     def on_mouse_move(self, event):
         # image_coords = self.imageSpace.coords(self.imageId)
@@ -71,9 +98,9 @@ class ImageApp:
             # print(f"x={event.x} mX={self.movedX}  y={event.y} mY={self.movedY} IX={self.image.width}  IY={self.image.height}")
             # image_x, image_y = self.imageSpace.coords(self.imageId)
             # print(f"Ob = {image_x} {image_y}")
-            if (0 <= x < self.image.width) and (0 <= y < self.image.height):
-                pixel_rgb = self.get_pixel_color(x, y)
-                self.update_pixel_info_label(x, y, pixel_rgb)
+            if (0 <= x < self.image.width * self.imscale) and (0 <= y < self.image.height * self.imscale):
+                pixel_rgb = self.get_pixel_color(int(x/self.imscale), int(y/self.imscale))
+                self.update_pixel_info_label(int(x/self.imscale), int(y/self.imscale), pixel_rgb)
             else:
                 self.pixel_info_label.config(text="")
 
@@ -94,7 +121,11 @@ class ImageApp:
 
     def loadJPG(self):
         filePath = askopenfilename()
+        if filePath == '':
+            return
         self.image = Image.open(filePath)
+        if self.image is None:
+            return
         self.tk_image = ImageTk.PhotoImage(self.image)
         if self.imageId is not None:
             self.imageSpace.delete(self.imageId)
@@ -102,6 +133,7 @@ class ImageApp:
         self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
         self.imageSpace.bind("<Motion>", self.on_mouse_move)
         self.bind_keyboard_events()
+        self.zoom_settings()
 
     def saveJPG(self):
         if self.image:
@@ -123,6 +155,8 @@ class ImageApp:
 
     def loadPPM(self):
         filePath = askopenfilename(filetypes=[("PPM P3 files", "*.ppm")])
+        if filePath == '':
+            return
         print(filePath)
 
         start_time = time.time()
@@ -155,6 +189,7 @@ class ImageApp:
         self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
         self.imageSpace.bind("<Motion>", self.on_mouse_move)
         self.bind_keyboard_events()
+        self.zoom_settings()
 
         end_time = time.time()
         execution_time = end_time - start_time
