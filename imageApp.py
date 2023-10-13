@@ -24,11 +24,8 @@ class ImageApp:
         self.loadPPMButton = tk.Button(self.frame, text="Load PPM P3", command=self.loadPPM, padx=20, pady=20)
         self.loadPPMButton.grid(row=0, column=2)
 
-        self.loadPPMButton = tk.Button(self.frame, text="Load PPM P3 16 bit", command=self.loadPPM16bit, padx=20, pady=20)
-        self.loadPPMButton.grid(row=0, column=3)
-
         self.savePPMButton = tk.Button(self.frame, text="Save PPM P3", command=self.savePPM, padx=20, pady=20)
-        self.savePPMButton.grid(row=0, column=4)
+        self.savePPMButton.grid(row=0, column=3)
 
         self.frameImage = tk.LabelFrame(self.root, labelanchor="n")
         self.frameImage.pack()
@@ -51,39 +48,15 @@ class ImageApp:
                 self.image.save(file_path, "JPEG")
                 print(f"Image saved as {file_path}")
 
-    def loadPPM16bit(self):
-        filePath = askopenfilename(filetypes=[("PPM P3 files", "*.ppm")])
-        print(filePath)
 
-        start_time = time.time()
-
-        if filePath:
-            allValues = []
-            with open(filePath, "r") as ppm_file:
-                firstLine = ppm_file.readline()
-                if firstLine != "P3\n":
-                    raise ValueError("Not a PPM P3 file")
-                for line in ppm_file:
-                    line = line.partition('#')[0].strip()
-                    if line == "":
-                        continue
-                    values = line.split()
-                    if len(allValues) >= 3:
-                        intValues = [int(val)//256 for val in values]
-                    else:
-                        intValues = [int(val) for val in values]
-                    allValues.extend(intValues)
-            print(allValues[:100])
-            self.image = Image.frombytes("RGB", (allValues[0], allValues[1]), bytes(allValues[3:]))
-            self.tk_image = ImageTk.PhotoImage(self.image)
-            if self.imageLabel is not None:
-                self.imageLabel.pack_forget()
-            self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
-            self.imageLabel.pack(side="top")
-
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Czas wykonania funkcji: {execution_time} sekundy")
+    def getValuesFromLine(self, line):
+        # Usuń komentarze i białe znaki z początku i końca linii
+        cleaned_line = line.split('#')[0].strip()
+        # Pomijaj puste linie
+        if not cleaned_line:
+            return None
+        values = cleaned_line.split()
+        return values
 
     def loadPPM(self):
         filePath = askopenfilename(filetypes=[("PPM P3 files", "*.ppm")])
@@ -91,99 +64,36 @@ class ImageApp:
 
         start_time = time.time()
 
-        if filePath:
-            allValues = []
-            with open(filePath, "r") as ppm_file:
-                firstLine = ppm_file.readline()
-                if firstLine != "P3\n":
-                    raise ValueError("Not a PPM P3 file")
-                for line in ppm_file:
-                    line = line.partition('#')[0].strip()
-                    if line == "":
-                        continue
-                    values = line.split()
-                    intValues = [int(val) for val in values]
-                    allValues.extend(intValues)
-            self.image = Image.frombytes("RGB", (allValues[0], allValues[1]), bytes(allValues[3:]))
-            self.tk_image = ImageTk.PhotoImage(self.image)
-            if self.imageLabel is not None:
-                self.imageLabel.pack_forget()
-            self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
-            self.imageLabel.pack(side="top")
+        allValues = []
+        with open(filePath, "r") as ppm_file:
+            for line in ppm_file:
+                values = self.getValuesFromLine(line)
+                if values:
+                    allValues.extend(values)
+
+        header = allValues[0]
+        width = int(allValues[1])
+        height = int(allValues[2])
+        maxColor = int(allValues[3])
+
+        if header != "P3":
+            raise ValueError("To nie jest plik PPM P3")
+
+        if maxColor <= 256:
+            pixels = [int(x) for x in allValues[4:]]
+        else:
+            pixels = [int(x)//256 for x in allValues[4:]]
+
+        self.image = Image.frombytes("RGB", (width, height), bytes(pixels))
+        self.tk_image = ImageTk.PhotoImage(self.image)
+        if self.imageLabel is not None:
+            self.imageLabel.pack_forget()
+        self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
+        self.imageLabel.pack(side="top")
 
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Czas wykonania funkcji: {execution_time} sekundy")
-
-
-
-    # def loadPPM(self):
-    #     filePath = askopenfilename(filetypes=[("PPM P3 files", "*.ppm")])
-    #     print(filePath)
-    #     if filePath:
-    #         with open(filePath, "r") as ppm_file:
-    #             self.image = self.load_ppm(ppm_file)
-    #             self.tk_image = ImageTk.PhotoImage(self.image)
-    #             if self.imageLabel is not None:
-    #                 self.imageLabel.pack_forget()
-    #             self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
-    #             self.imageLabel.pack(side="top")
-    #
-    # def get_parameters(self, ppm_lines):
-    #     count = 0
-    #     values = []
-    #     for line in ppm_lines[1:]:
-    #         s = ""
-    #         for char in line:
-    #             if char == "#":
-    #                 break
-    #             if char.isdigit():
-    #                 s += char
-    #             else:
-    #                 if s.isnumeric():
-    #                     values.append(int(s))
-    #                     count += 1
-    #                     if count == 3:
-    #                         return values[0], values[1], values[2]
-    #                 s = ""
-    #         if s != "" and s.isnumeric():
-    #             values.append(int(s))
-    #             count += 1
-    #             if count == 3:
-    #                 return values[0], values[1], values[2]
-    # def load_ppm(self, ppm_file):
-    #     ppm_data = ppm_file.read()
-    #     ppm_lines = ppm_data.split("\n")
-    #     ppm_lines = [line.split('#')[0].strip() for line in ppm_lines]
-    #     if ppm_lines[0] != "P3":
-    #         raise ValueError("Not a PPM P3 file")
-    #
-    #     width, height, max_color = self.get_parameters(ppm_lines)
-    #
-    #     values = []
-    #     for line in ppm_lines[1:]:
-    #         s = ""
-    #         for char in line:
-    #             if char == "#":
-    #                 break
-    #             if char.isdigit():
-    #                 s += char
-    #             else:
-    #                 if s.isnumeric():
-    #                     if max_color > 255:
-    #                         values.append(int(s) // 256)
-    #                     else:
-    #                         values.append(int(s))
-    #                 s = ""
-    #         if s != "" and s.isnumeric():
-    #             if max_color > 255:
-    #                 values.append(int(s) // 256)
-    #             else:
-    #                 values.append(int(s))
-    #     pixels = []
-    #     for value in values[3:]:
-    #         pixels.append(value)
-    #     return Image.frombytes("RGB", (width, height), bytes(pixels))
 
     def savePPM(self):
         if hasattr(self, 'image'):
