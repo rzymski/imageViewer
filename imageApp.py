@@ -2,7 +2,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter.filedialog import asksaveasfilename, askopenfilename
 
-from tkinter import ALL, EventType
+from tkinter import messagebox
 
 import time
 
@@ -29,8 +29,11 @@ class ImageApp:
         self.savePPMButton = tk.Button(self.frame, text="Save PPM P3", command=self.savePPM, padx=20, pady=20)
         self.savePPMButton.grid(row=0, column=3)
 
+        self.linearScaleButton = tk.Button(self.frame, text="Linear Scale", command=self.linearScale, padx=20, pady=20)
+        self.linearScaleButton.grid(row=0, column=4)
+
         self.pixel_info_label = tk.Label(self.frame, text="", padx=10, pady=10)
-        self.pixel_info_label.grid(row=0, column=4)
+        self.pixel_info_label.grid(row=0, column=5)
 
         self.imageSpace = tk.Canvas(self.root, bg="white")
         self.imageSpace.pack(fill="both", expand=True)
@@ -38,6 +41,7 @@ class ImageApp:
         self.imageId = None
         self.movedX = 0
         self.movedY = 0
+        self.ppmP3File = False
 
     def zoom_settings(self):
         self.root.bind("<MouseWheel>", self.wheel)
@@ -168,20 +172,22 @@ class ImageApp:
                 if values:
                     allValues.extend(values)
 
-        header = allValues[0]
-        width = int(allValues[1])
-        height = int(allValues[2])
-        maxColor = int(allValues[3])
+        self.header = allValues[0]
+        self.width = int(allValues[1])
+        self.height = int(allValues[2])
+        self.maxColor = int(allValues[3])
 
-        if header != "P3":
+        if self.header != "P3":
             raise ValueError("To nie jest plik PPM P3")
 
-        if maxColor <= 256:
-            pixels = [int(x) for x in allValues[4:]]
+        if self.maxColor <= 256:
+            self.pixels = [int(x) for x in allValues[4:]]
         else:
-            pixels = [int(x)//256 for x in allValues[4:]]
-
-        self.image = Image.frombytes("RGB", (width, height), bytes(pixels))
+            self.pixels = [int(x)//256 for x in allValues[4:]]
+        # print(f"MAX VALUE RED: {max(pixels[0::3])}")
+        # print(f"MAX VALUE GREEN: {max(pixels[1::3])}")
+        # print(f"MAX VALUE BLUE: {max(pixels[2::3])}")
+        self.image = Image.frombytes("RGB", (self.width, self.height), bytes(self.pixels))
         self.tk_image = ImageTk.PhotoImage(self.image)
         if self.imageId is not None:
             self.imageSpace.delete(self.imageId)
@@ -194,6 +200,36 @@ class ImageApp:
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Czas wykonania funkcji: {execution_time} sekundy")
+        self.ppmP3File = True
+
+    def linearScale(self):
+        if self.ppmP3File:
+            redMax = max(self.pixels[0::3])
+            greenMax = max(self.pixels[1::3])
+            blueMax = max(self.pixels[2::3])
+            changeScale = tk.messagebox.askyesno(title="Linear scale", message=f"Actual max RGB = ({redMax},{greenMax},{blueMax}). Do you want rescale it?")
+            if changeScale:
+                redScale = self.maxColor / redMax
+                greenScale = self.maxColor / greenMax
+                blueScale = self.maxColor / blueMax
+                scaledPixels = []
+                print(self.pixels[:10])
+                for i, pixel in enumerate(self.pixels):
+                    if i % 3 == 0:
+                        pixel *= redScale
+                    elif i % 3 == 1:
+                        pixel *= greenScale
+                    else:
+                        pixel *= blueScale
+                    scaledPixels.append(int(pixel))
+                self.imageSpace.delete(self.imageId)
+                self.movedX, self.movedY = 0, 0
+                self.image = Image.frombytes("RGB", (self.width, self.height), bytes(scaledPixels))
+                self.tk_image = ImageTk.PhotoImage(self.image)
+                self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
+                self.imageSpace.bind("<Motion>", self.on_mouse_move)
+                self.bind_keyboard_events()
+                self.zoom_settings()
 
     def savePPM(self):
         if self.image:
