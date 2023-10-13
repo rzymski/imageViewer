@@ -30,63 +30,52 @@ class ImageApp:
         self.pixel_info_label = tk.Label(self.frame, text="", padx=10, pady=10)
         self.pixel_info_label.grid(row=0, column=4)
 
-        self.frameImage = tk.LabelFrame(self.root, labelanchor="n")
-        self.frameImage.pack()
-        self.imageLabel = None
+        self.imageSpace = tk.Canvas(self.root, bg="white")
+        self.imageSpace.pack(fill="both", expand=True)
         self.image = None
+        self.imageId = None
 
+        self.movedX = 0
+        self.movedY = 0
+
+    def move_image(self, dx, dy):
+        if self.imageId is not None:
+            self.movedX += dx
+            self.movedY += dy
+            self.imageSpace.move(self.imageId, dx, dy)
+
+    def move_image_left(self, event):
+        self.move_image(10, 0)
+
+    def move_image_right(self, event):
+        self.move_image(-10, 0)
+
+    def move_image_up(self, event):
+        self.move_image(0, 10)
+
+    def move_image_down(self, event):
+        self.move_image(0, -10)
+
+    def bind_keyboard_events(self):
         self.root.bind("<Left>", self.move_image_left)
         self.root.bind("<Right>", self.move_image_right)
         self.root.bind("<Up>", self.move_image_up)
         self.root.bind("<Down>", self.move_image_down)
 
-    def move_image_left(self, event):
-        self.move_image(-10, 0)
-
-    def move_image_right(self, event):
-        self.move_image(10, 0)
-
-    def move_image_up(self, event):
-        self.move_image(0, -10)
-
-    def move_image_down(self, event):
-        self.move_image(0, 10)
-
-    def move_image(self, dx, dy):
-        if self.imageLabel is not None:
-            self.frameImage.update()  # Ensure the frame is updated
-            self.frameImage.update_idletasks()
-            self.frameImage.place_forget()
-            self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
-            self.imageLabel.pack(side="top")
-            self.canvas.move(self.imageLabel, dx, dy)
-
-        # self.canvas = tk.Canvas(self.frameImage, cursor="cross")  # Use a Canvas widget to display the image
-        # self.canvas.pack(side="top", fill="both", expand=True)
-        #
-        # self.canvas.bind("<Motion>", self.on_mouse_move)  # Bind the event to the Canvas
-        # self.canvas.bind("<ButtonPress-1>", self.on_mouse_click)  # Bind left mouse button press event
-        # self.canvas.bind("<B1-Motion>", self.on_mouse_drag)  # Bind left mouse button drag event
-        #
-        # self.last_x = 0  # Store the last X coordinate for dragging
-        # self.last_y = 0  # Store the last Y coordinate for dragging
-
-    # def on_mouse_click(self, event):
-    #     self.last_x = event.x
-    #     self.last_y = event.y
-    #
-    # def on_mouse_drag(self, event):
-    #     if self.imageLabel is not None:
-    #         x, y = event.x, event.y
-    #         self.canvas.move(self.imageLabel, x - self.last_x, y - self.last_y)
-    #         self.last_x = x
-    #         self.last_y = y
-
     def on_mouse_move(self, event):
-        if self.imageLabel is not None:
-            x, y = event.x, event.y
-            pixel_rgb = self.get_pixel_color(x, y)
-            self.update_pixel_info_label(x, y, pixel_rgb)
+        # image_coords = self.imageSpace.coords(self.imageId)
+        # print(f"{image_coords} {self.image.width} {self.image.height}")
+        # print(f"f{self.image}")
+        if self.image is not None:
+            x, y = event.x-self.movedX, event.y-self.movedY
+            # print(f"x={event.x} mX={self.movedX}  y={event.y} mY={self.movedY} IX={self.image.width}  IY={self.image.height}")
+            # image_x, image_y = self.imageSpace.coords(self.imageId)
+            # print(f"Ob = {image_x} {image_y}")
+            if (0 <= x < self.image.width) and (0 <= y < self.image.height):
+                pixel_rgb = self.get_pixel_color(x, y)
+                self.update_pixel_info_label(x, y, pixel_rgb)
+            else:
+                self.pixel_info_label.config(text="")
 
     def get_pixel_color(self, x, y):
         if self.image is not None:
@@ -107,11 +96,12 @@ class ImageApp:
         filePath = askopenfilename()
         self.image = Image.open(filePath)
         self.tk_image = ImageTk.PhotoImage(self.image)
-        if self.imageLabel is not None:
-            self.imageLabel.pack_forget()
-        self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
-        self.imageLabel.pack(side="top")
-        self.imageLabel.bind("<Motion>", self.on_mouse_move)
+        if self.imageId is not None:
+            self.imageSpace.delete(self.imageId)
+            self.movedX, self.movedY = 0, 0
+        self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
+        self.imageSpace.bind("<Motion>", self.on_mouse_move)
+        self.bind_keyboard_events()
 
     def saveJPG(self):
         if self.image:
@@ -159,11 +149,12 @@ class ImageApp:
 
         self.image = Image.frombytes("RGB", (width, height), bytes(pixels))
         self.tk_image = ImageTk.PhotoImage(self.image)
-        if self.imageLabel is not None:
-            self.imageLabel.pack_forget()
-        self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
-        self.imageLabel.pack(side="top")
-        self.imageLabel.bind("<Motion>", self.on_mouse_move)
+        if self.imageId is not None:
+            self.imageSpace.delete(self.imageId)
+            self.movedX, self.movedY = 0, 0
+        self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
+        self.imageSpace.bind("<Motion>", self.on_mouse_move)
+        self.bind_keyboard_events()
 
         end_time = time.time()
         execution_time = end_time - start_time
