@@ -27,10 +27,81 @@ class ImageApp:
         self.savePPMButton = tk.Button(self.frame, text="Save PPM P3", command=self.savePPM, padx=20, pady=20)
         self.savePPMButton.grid(row=0, column=3)
 
+        self.pixel_info_label = tk.Label(self.frame, text="", padx=10, pady=10)
+        self.pixel_info_label.grid(row=0, column=4)
+
         self.frameImage = tk.LabelFrame(self.root, labelanchor="n")
         self.frameImage.pack()
         self.imageLabel = None
         self.image = None
+
+        self.root.bind("<Left>", self.move_image_left)
+        self.root.bind("<Right>", self.move_image_right)
+        self.root.bind("<Up>", self.move_image_up)
+        self.root.bind("<Down>", self.move_image_down)
+
+    def move_image_left(self, event):
+        self.move_image(-10, 0)
+
+    def move_image_right(self, event):
+        self.move_image(10, 0)
+
+    def move_image_up(self, event):
+        self.move_image(0, -10)
+
+    def move_image_down(self, event):
+        self.move_image(0, 10)
+
+    def move_image(self, dx, dy):
+        if self.imageLabel is not None:
+            self.frameImage.update()  # Ensure the frame is updated
+            self.frameImage.update_idletasks()
+            self.frameImage.place_forget()
+            self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
+            self.imageLabel.pack(side="top")
+            self.canvas.move(self.imageLabel, dx, dy)
+
+        # self.canvas = tk.Canvas(self.frameImage, cursor="cross")  # Use a Canvas widget to display the image
+        # self.canvas.pack(side="top", fill="both", expand=True)
+        #
+        # self.canvas.bind("<Motion>", self.on_mouse_move)  # Bind the event to the Canvas
+        # self.canvas.bind("<ButtonPress-1>", self.on_mouse_click)  # Bind left mouse button press event
+        # self.canvas.bind("<B1-Motion>", self.on_mouse_drag)  # Bind left mouse button drag event
+        #
+        # self.last_x = 0  # Store the last X coordinate for dragging
+        # self.last_y = 0  # Store the last Y coordinate for dragging
+
+    # def on_mouse_click(self, event):
+    #     self.last_x = event.x
+    #     self.last_y = event.y
+    #
+    # def on_mouse_drag(self, event):
+    #     if self.imageLabel is not None:
+    #         x, y = event.x, event.y
+    #         self.canvas.move(self.imageLabel, x - self.last_x, y - self.last_y)
+    #         self.last_x = x
+    #         self.last_y = y
+
+    def on_mouse_move(self, event):
+        if self.imageLabel is not None:
+            x, y = event.x, event.y
+            pixel_rgb = self.get_pixel_color(x, y)
+            self.update_pixel_info_label(x, y, pixel_rgb)
+
+    def get_pixel_color(self, x, y):
+        if self.image is not None:
+            try:
+                pixel = self.image.getpixel((x, y))
+                return pixel
+            except Exception as e:
+                print(f"Error getting pixel color: {e}")
+        return None
+
+    def update_pixel_info_label(self, x, y, pixel_rgb):
+        if pixel_rgb is not None:
+            r, g, b = pixel_rgb
+            info_text = f"X: {x}, Y: {y}, R: {r}, G: {g}, B: {b}"
+            self.pixel_info_label.config(text=info_text)
 
     def loadJPG(self):
         filePath = askopenfilename()
@@ -40,14 +111,16 @@ class ImageApp:
             self.imageLabel.pack_forget()
         self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
         self.imageLabel.pack(side="top")
+        self.imageLabel.bind("<Motion>", self.on_mouse_move)
 
     def saveJPG(self):
-        if hasattr(self, 'image'):
-            file_path = asksaveasfilename(initialfile='Untitled.jpg', defaultextension=".jpg", filetypes=[("JPEG files", "*.jpg")])
-            if file_path:
-                self.image.save(file_path, "JPEG")
-                print(f"Image saved as {file_path}")
-
+        if self.image:
+            compression_quality = tk.simpledialog.askinteger("Compression Quality", "Enter compression quality (0-100):", minvalue=0, maxvalue=100)
+            if compression_quality is not None:
+                file_path = asksaveasfilename(initialfile='Untitled.jpg', defaultextension=".jpg", filetypes=[("JPEG files", "*.jpg")])
+                if file_path:
+                    self.image.save(file_path, "JPEG", quality=compression_quality)
+                    print(f"Image saved as {file_path} with compression quality {compression_quality}")
 
     def getValuesFromLine(self, line):
         # Usuń komentarze i białe znaki z początku i końca linii
@@ -90,13 +163,14 @@ class ImageApp:
             self.imageLabel.pack_forget()
         self.imageLabel = tk.Label(self.frameImage, image=self.tk_image)
         self.imageLabel.pack(side="top")
+        self.imageLabel.bind("<Motion>", self.on_mouse_move)
 
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Czas wykonania funkcji: {execution_time} sekundy")
 
     def savePPM(self):
-        if hasattr(self, 'image'):
+        if self.image:
             file_path = asksaveasfilename(initialfile='Untitled.ppm', defaultextension=".ppm",
                                           filetypes=[("PPM P3 files", "*.ppm")])
             if file_path:
@@ -104,9 +178,9 @@ class ImageApp:
                 print(f"Image saved as {file_path}")
 
     def save_ppm(self, file_path):
-        if hasattr(self, 'image'):
+        if self.image:
             width, height = self.image.size
-            max_color = 255  # Adjust this as needed
+            max_color = 255
 
             with open(file_path, "w") as ppm_file:
                 ppm_file.write("P3\n")
