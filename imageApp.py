@@ -44,7 +44,8 @@ class ImageApp:
         self.imageId = None
         self.movedX = 0
         self.movedY = 0
-        self.ppmP3 = False
+        self.ppm = False
+        self.jpg = False
 
     def zoom_settings(self):
         self.root.bind("<MouseWheel>", self.wheel)
@@ -152,9 +153,11 @@ class ImageApp:
             return
         self.tk_image = ImageTk.PhotoImage(self.image)
         self.settingsAfterLoad()
+        self.ppm = False
+        self.jpg = True
 
     def saveJPG(self):
-        if self.image:
+        if self.image and self.jpg:
             compression_quality = tk.simpledialog.askinteger("Compression Quality", "Enter compression quality (0-100):", minvalue=0, maxvalue=100)
             if compression_quality is not None:
                 file_path = asksaveasfilename(initialfile='Untitled.jpg', defaultextension=".jpg", filetypes=[("JPEG files", "*.jpg")])
@@ -205,7 +208,8 @@ class ImageApp:
         self.tk_image = ImageTk.PhotoImage(self.image)
         self.measureTime("end")
         self.settingsAfterLoad()
-        self.ppmP3 = True
+        self.ppm = True
+        self.jpg = False
 
     def decodeSkipCommentsEmptyLines(self, file):
         while True:
@@ -252,10 +256,11 @@ class ImageApp:
         self.tk_image = ImageTk.PhotoImage(self.image)
         self.measureTime("end")
         self.settingsAfterLoad()
-        self.ppmP3 = True
+        self.ppm = True
+        self.jpg = False
 
     def linearScale(self):
-        if self.ppmP3:
+        if self.ppm:
             redMax = max(self.pixels[0::3])
             greenMax = max(self.pixels[1::3])
             blueMax = max(self.pixels[2::3])
@@ -285,15 +290,15 @@ class ImageApp:
                 self.zoom_settings()
 
     def savePPM(self):
-        if self.image:
+        if self.image and self.ppm:
             file_path = asksaveasfilename(initialfile='Untitled.ppm', defaultextension=".ppm",
                                           filetypes=[("PPM P3 files", "*.ppm")])
             if file_path:
-                self.save_ppm(file_path)
+                self.savePPMP3(file_path)
                 print(f"Image saved as {file_path}")
 
-    def save_ppm(self, file_path):
-        if self.image:
+    def savePPMP3(self, file_path):
+        if self.image and self.ppm:
             width, height = self.image.size
             max_color = 255
 
