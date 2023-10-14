@@ -23,17 +23,20 @@ class ImageApp:
         self.saveJPGButton = tk.Button(self.frame, text="Save JPG", command=self.saveJPG, padx=20, pady=20)
         self.saveJPGButton.grid(row=0, column=1)
 
-        self.loadPPMButton = tk.Button(self.frame, text="Load PPM P3", command=self.loadPPM, padx=20, pady=20)
-        self.loadPPMButton.grid(row=0, column=2)
+        self.loadPPM3Button = tk.Button(self.frame, text="Load PPM P3", command=self.loadPPMP3, padx=20, pady=20)
+        self.loadPPM3Button.grid(row=0, column=2)
 
         self.savePPMButton = tk.Button(self.frame, text="Save PPM P3", command=self.savePPM, padx=20, pady=20)
         self.savePPMButton.grid(row=0, column=3)
 
+        self.loadPPMP6Button = tk.Button(self.frame, text="Load PPM P6", command=self.loadPPMP6, padx=20, pady=20)
+        self.loadPPMP6Button.grid(row=0, column=4)
+
         self.linearScaleButton = tk.Button(self.frame, text="Linear Scale", command=self.linearScale, padx=20, pady=20)
-        self.linearScaleButton.grid(row=0, column=4)
+        self.linearScaleButton.grid(row=0, column=5)
 
         self.pixel_info_label = tk.Label(self.frame, text="", padx=10, pady=10)
-        self.pixel_info_label.grid(row=0, column=5)
+        self.pixel_info_label.grid(row=0, column=6)
 
         self.imageSpace = tk.Canvas(self.root, bg="white")
         self.imageSpace.pack(fill="both", expand=True)
@@ -41,7 +44,7 @@ class ImageApp:
         self.imageId = None
         self.movedX = 0
         self.movedY = 0
-        self.ppmP3File = False
+        self.ppmP3 = False
 
     def zoom_settings(self):
         self.root.bind("<MouseWheel>", self.wheel)
@@ -123,6 +126,23 @@ class ImageApp:
             info_text = f"X: {x}, Y: {y}, R: {r}, G: {g}, B: {b}"
             self.pixel_info_label.config(text=info_text)
 
+    def settingsAfterLoad(self):
+        if self.imageId is not None:
+            self.imageSpace.delete(self.imageId)
+            self.movedX, self.movedY = 0, 0
+        self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
+        self.imageSpace.bind("<Motion>", self.on_mouse_move)
+        self.bind_keyboard_events()
+        self.zoom_settings()
+
+    def measureTime(self, startEnd):
+        if startEnd == "start":
+            self.start_time = time.time()
+        elif startEnd == "end":
+            self.end_time = time.time()
+            execution_time = self.end_time - self.start_time
+            print(f"Czas wykonania funkcji: {execution_time} sekundy")
+
     def loadJPG(self):
         filePath = askopenfilename()
         if filePath == '':
@@ -131,13 +151,7 @@ class ImageApp:
         if self.image is None:
             return
         self.tk_image = ImageTk.PhotoImage(self.image)
-        if self.imageId is not None:
-            self.imageSpace.delete(self.imageId)
-            self.movedX, self.movedY = 0, 0
-        self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
-        self.imageSpace.bind("<Motion>", self.on_mouse_move)
-        self.bind_keyboard_events()
-        self.zoom_settings()
+        self.settingsAfterLoad()
 
     def saveJPG(self):
         if self.image:
@@ -157,13 +171,13 @@ class ImageApp:
         values = cleaned_line.split()
         return values
 
-    def loadPPM(self):
+    def loadPPMP3(self):
         filePath = askopenfilename(filetypes=[("PPM P3 files", "*.ppm")])
         if filePath == '':
             return
         print(filePath)
 
-        start_time = time.time()
+        self.measureTime("start")
 
         allValues = []
         with open(filePath, "r") as ppm_file:
@@ -189,21 +203,59 @@ class ImageApp:
         # print(f"MAX VALUE BLUE: {max(pixels[2::3])}")
         self.image = Image.frombytes("RGB", (self.width, self.height), bytes(self.pixels))
         self.tk_image = ImageTk.PhotoImage(self.image)
-        if self.imageId is not None:
-            self.imageSpace.delete(self.imageId)
-            self.movedX, self.movedY = 0, 0
-        self.imageId = self.imageSpace.create_image(0, 0, anchor="nw", image=self.tk_image)
-        self.imageSpace.bind("<Motion>", self.on_mouse_move)
-        self.bind_keyboard_events()
-        self.zoom_settings()
+        self.measureTime("end")
+        self.settingsAfterLoad()
+        self.ppmP3 = True
 
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Czas wykonania funkcji: {execution_time} sekundy")
-        self.ppmP3File = True
+    def decodeSkipCommentsEmptyLines(self, file):
+        while True:
+            line = file.readline().decode("ansi").strip()
+            cleaned_line = line.split('#')[0].strip()
+            if cleaned_line:
+                return cleaned_line
+
+    def readBinaryDataInChunks(self, file, chunk_size=4096):
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
+            for byte in chunk:
+                yield int(byte)
+
+    def loadPPMP6(self):
+        filePath = askopenfilename(filetypes=[("PPM P6 files", "*.ppm")])
+        if filePath == '':
+            return
+        print(filePath)
+
+        self.measureTime("start")
+
+        with open(filePath, "rb") as ppm_file:
+            parameters = [self.decodeSkipCommentsEmptyLines(ppm_file)]
+            while len(parameters) < 4:
+                line = self.decodeSkipCommentsEmptyLines(ppm_file)
+                lineValues = map(int, line.split())
+                parameters.extend(lineValues)
+            # print(parameters)
+
+            self.header = parameters[0]
+            self.width = parameters[1]
+            self.height = parameters[2]
+            self.maxColor = parameters[3]
+
+            if self.header != "P6":
+                raise ValueError("To nie jest plik PPM P6")
+
+            self.pixels = list(self.readBinaryDataInChunks(ppm_file))
+
+        self.image = Image.frombytes("RGB", (self.width, self.height), bytes(self.pixels))
+        self.tk_image = ImageTk.PhotoImage(self.image)
+        self.measureTime("end")
+        self.settingsAfterLoad()
+        self.ppmP3 = True
 
     def linearScale(self):
-        if self.ppmP3File:
+        if self.ppmP3:
             redMax = max(self.pixels[0::3])
             greenMax = max(self.pixels[1::3])
             blueMax = max(self.pixels[2::3])
@@ -213,7 +265,7 @@ class ImageApp:
                 greenScale = self.maxColor / greenMax
                 blueScale = self.maxColor / blueMax
                 scaledPixels = []
-                print(self.pixels[:10])
+                # print(self.pixels[:10])
                 for i, pixel in enumerate(self.pixels):
                     if i % 3 == 0:
                         pixel *= redScale
@@ -222,6 +274,7 @@ class ImageApp:
                     else:
                         pixel *= blueScale
                     scaledPixels.append(int(pixel))
+                # print(scaledPixels[:10])
                 self.imageSpace.delete(self.imageId)
                 self.movedX, self.movedY = 0, 0
                 self.image = Image.frombytes("RGB", (self.width, self.height), bytes(scaledPixels))
