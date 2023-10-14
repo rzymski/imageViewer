@@ -23,17 +23,14 @@ class ImageApp:
         self.saveJPGButton = tk.Button(self.frame, text="Save JPG", command=self.saveJPG, padx=20, pady=20)
         self.saveJPGButton.grid(row=0, column=1)
 
-        self.loadPPM3Button = tk.Button(self.frame, text="Load PPM P3", command=self.loadPPMP3, padx=20, pady=20)
+        self.loadPPM3Button = tk.Button(self.frame, text="Load PPM FILE", command=self.loadFile, padx=20, pady=20)
         self.loadPPM3Button.grid(row=0, column=2)
 
-        self.savePPMButton = tk.Button(self.frame, text="Save PPM P3", command=self.savePPM, padx=20, pady=20)
+        self.savePPMButton = tk.Button(self.frame, text="Save as PPM P3", command=self.savePPM, padx=20, pady=20)
         self.savePPMButton.grid(row=0, column=3)
 
-        self.loadPPMP6Button = tk.Button(self.frame, text="Load PPM P6", command=self.loadPPMP6, padx=20, pady=20)
-        self.loadPPMP6Button.grid(row=0, column=4)
-
         self.linearScaleButton = tk.Button(self.frame, text="Linear Scale", command=self.linearScale, padx=20, pady=20)
-        self.linearScaleButton.grid(row=0, column=5)
+        self.linearScaleButton.grid(row=0, column=4)
 
         self.pixel_info_label = tk.Label(self.frame, text="", padx=10, pady=10)
         self.pixel_info_label.grid(row=0, column=6)
@@ -165,6 +162,21 @@ class ImageApp:
                     self.image.save(file_path, "JPEG", quality=compression_quality)
                     print(f"Image saved as {file_path} with compression quality {compression_quality}")
 
+    def loadFile(self):
+        filePath = askopenfilename(filetypes=[("PPM P3/P6 files", "*.ppm")])
+        if filePath == '':
+            return
+        print(filePath)
+        with open(filePath, "rb") as ppm_file:
+            firstLine = ppm_file.readline().decode("ansi").strip()
+        #print(firstLine)
+        if firstLine == "P3":
+            self.loadPPMP3(filePath)
+        elif firstLine == "P6":
+            self.loadPPMP6(filePath)
+        else:
+            raise ValueError("To nie jest ani plik PPM P3, ani plik PPM P6")
+
     def getValuesFromLine(self, line):
         # Usuń komentarze i białe znaki z początku i końca linii
         cleaned_line = line.split('#')[0].strip()
@@ -174,14 +186,8 @@ class ImageApp:
         values = cleaned_line.split()
         return values
 
-    def loadPPMP3(self):
-        filePath = askopenfilename(filetypes=[("PPM P3 files", "*.ppm")])
-        if filePath == '':
-            return
-        print(filePath)
-
+    def loadPPMP3(self, filePath):
         self.measureTime("start")
-
         allValues = []
         with open(filePath, "r") as ppm_file:
             for line in ppm_file:
@@ -226,14 +232,8 @@ class ImageApp:
             for byte in chunk:
                 yield int(byte)
 
-    def loadPPMP6(self):
-        filePath = askopenfilename(filetypes=[("PPM P6 files", "*.ppm")])
-        if filePath == '':
-            return
-        print(filePath)
-
+    def loadPPMP6(self, filePath):
         self.measureTime("start")
-
         with open(filePath, "rb") as ppm_file:
             parameters = [self.decodeSkipCommentsEmptyLines(ppm_file)]
             while len(parameters) < 4:
