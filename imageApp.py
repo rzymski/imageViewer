@@ -175,7 +175,15 @@ class ImageApp:
         elif firstLine == "P6":
             self.loadPPMP6(filePath)
         else:
-            raise ValueError("To nie jest ani plik PPM P3, ani plik PPM P6")
+            self.errorHandling("To nie jest ani plik PPM P3, ani plik PPM P6", filePath)
+            #raise ValueError("To nie jest ani plik PPM P3, ani plik PPM P6")
+
+    def errorHandling(self, informationAboutError, filePath):
+        error_window = tk.Toplevel(self.root)
+        error_window.title("Error")
+        errorText = f"Błąd podczas wczytywania pliku:\n{filePath}\nBłąd: {informationAboutError}"
+        error_label = tk.Label(error_window, text=errorText, padx=10, pady=10, justify="left")
+        error_label.pack()
 
     def getValuesFromLine(self, line):
         # Usuń komentarze i białe znaki z początku i końca linii
@@ -201,7 +209,11 @@ class ImageApp:
         self.maxColor = int(allValues[3])
 
         if self.header != "P3":
-            raise ValueError("To nie jest plik PPM P3")
+            self.errorHandling("To nie jest plik PPM P3", filePath)
+            return
+        if len(allValues[4:]) != self.width * self.height * 3:
+            self.errorHandling(f"Nie wystarczająca ilość danych.\nPowinno być {self.width}*{self.height}*3={self.width*self.height*3}, a otrzymano tylko {len(allValues[4:])}", filePath)
+            return
 
         if self.maxColor <= 256:
             self.pixels = [int(x) for x in allValues[4:]]
@@ -241,16 +253,20 @@ class ImageApp:
                 lineValues = map(int, line.split())
                 parameters.extend(lineValues)
             # print(parameters)
-
             self.header = parameters[0]
             self.width = parameters[1]
             self.height = parameters[2]
             self.maxColor = parameters[3]
 
             if self.header != "P6":
-                raise ValueError("To nie jest plik PPM P6")
+                self.errorHandling("To nie jest plik PPM P6")
+                return
 
             self.pixels = list(self.readBinaryDataInChunks(ppm_file))
+
+            if len(self.pixels) != self.width * self.height * 3:
+                self.errorHandling(f"Nie wystarczająca ilość danych.\nPowinno być {self.width}*{self.height}*3={self.width * self.height * 3}, a otrzymano tylko {len(self.pixels)}",filePath)
+                return
 
         self.image = Image.frombytes("RGB", (self.width, self.height), bytes(self.pixels))
         self.tk_image = ImageTk.PhotoImage(self.image)
